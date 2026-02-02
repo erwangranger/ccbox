@@ -11,9 +11,16 @@ FULL_REGISTRY_IMAGE="${REGISTRY}/${REGISTRY_IMAGE}"
 LOCAL_IMAGE_NAME="ccbox"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Generate a unique session identifier
+generate_session_id() {
+    cat /proc/sys/kernel/random/uuid | cut -c1-8
+}
+
 # Generate a unique container name based on workspace directory
+# If session_id is provided, appends it for multi-session support
 generate_container_name() {
     local workspace_dir="$1"
+    local session_id="$2"
     local project_name
     project_name=$(basename "$workspace_dir")
     # Sanitize: lowercase, replace invalid chars with dashes
@@ -21,7 +28,12 @@ generate_container_name() {
     # Add short hash of full path for uniqueness (handles same-named dirs)
     local path_hash
     path_hash=$(echo -n "$workspace_dir" | md5sum | cut -c1-8)
-    echo "ccbox-${project_name}-${path_hash}"
+
+    if [[ -n "$session_id" ]]; then
+        echo "ccbox-${project_name}-${path_hash}-${session_id}"
+    else
+        echo "ccbox-${project_name}-${path_hash}"
+    fi
 }
 
 # Setup project-specific directories under ~/.claude/ccbox-projects/
@@ -104,6 +116,7 @@ log_error() {
 BUILD_ONLY=false
 USE_LOCAL=false
 NO_FIREWALL=true
+LIST_SESSIONS=false
 CLAUDE_VERSION=""
 EXTRA_ARGS=()
 
@@ -129,6 +142,10 @@ while [[ $# -gt 0 ]]; do
             NO_FIREWALL=false
             shift
             ;;
+        --list-sessions)
+            LIST_SESSIONS=true
+            shift
+            ;;
         --)
             shift
             EXTRA_ARGS=("$@")
@@ -144,6 +161,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --local                  Use locally-built image instead of pulling"
             echo "  --claude-version VERSION Use specific Claude Code version"
             echo "  --with-firewall          Enable network firewall restrictions"
+            echo "  --list-sessions          List active sessions for this project"
             echo "  -h, --help               Show this help message"
             echo ""
             echo "Examples:"
@@ -166,6 +184,15 @@ done
 if ! command -v podman &> /dev/null; then
     log_error "podman is not installed or not in PATH"
     exit 1
+fi
+
+# Handle --list-sessions early (doesn't need image)
+if $LIST_SESSIONS; then
+    WORKSPACE_DIR="$(pwd)"
+    BASE_NAME=$(generate_container_name "$WORKSPACE_DIR")
+    log_info "Active sessions for: $(basename "$WORKSPACE_DIR")"
+    podman ps --filter "name=^${BASE_NAME}" --format "table {{.Names}}\t{{.Status}}\t{{.CreatedAt}}"
+    exit 0
 fi
 
 # Read version from CLAUDE_VERSION file if not specified via command line
@@ -256,7 +283,8 @@ fi
 
 # Prepare mount points
 WORKSPACE_DIR="$(pwd)"
-CONTAINER_NAME=$(generate_container_name "$WORKSPACE_DIR")
+SESSION_ID=$(generate_session_id)
+CONTAINER_NAME=$(generate_container_name "$WORKSPACE_DIR" "$SESSION_ID")
 CLAUDE_CONFIG_DIR="${HOME}/.claude"
 GOOGLE_CONFIG_DIR="${HOME}/.config/gcloud"
 
@@ -339,6 +367,7 @@ fi
 
 log_info "Starting Claude Code container..."
 log_info "Workspace: $WORKSPACE_DIR"
+log_info "Session: $SESSION_ID"
 log_info "Firewall: $(if $NO_FIREWALL; then echo 'disabled'; else echo 'enabled'; fi)"
 
 # Run the container

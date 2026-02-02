@@ -25,7 +25,12 @@ By default, the container image is pulled from `quay.io/guimou/ccbox`.
 
 # Pass arguments directly to claude
 ./ccbox -- --version
+
+# List active sessions for current project
+./ccbox --list-sessions
 ```
+
+Multiple sessions can run simultaneously in the same project. Each session gets a unique container name with a session ID suffix, while sharing project data (history, todos, plans, tasks).
 
 ## Build (Development)
 
@@ -97,6 +102,7 @@ Google Cloud credentials are mounted read-only from `~/.config/gcloud`.
 - **SELinux**: Uses `:Z` volume labels for private relabeling
 - **Firewall**: Optional, requires `NET_ADMIN` and `NET_RAW` capabilities
 - **Project Isolation**: Each project gets its own history and session data in `~/.claude/ccbox-projects/`
+- **Multi-Session**: Multiple sessions can run simultaneously per project, each with a unique container name (`ccbox-{project}-{hash}-{session-id}`)
 
 ## License
 

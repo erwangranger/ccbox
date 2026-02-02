@@ -9,6 +9,7 @@ An opinionated, containerized Claude Code environment for Fedora.
 ccbox is my personal take on running [Claude Code](https://claude.com/product/claude-code) inside a container. It provides:
 
 - **Isolation** - Each project gets its own history, todos, and session data
+- **Multi-session** - Run multiple Claude Code sessions simultaneously in the same project
 - **Consistency** - Same Fedora-based environment everywhere, with common dev tools pre-installed
 - **Rootless Podman** - Runs without root privileges using user namespaces
 - **SELinux support** - Works out of the box on Fedora with proper volume labeling
@@ -51,7 +52,12 @@ ccbox -- --version
 
 # Run with network firewall (restricts outbound connections)
 ccbox --with-firewall
+
+# List active sessions for the current project
+ccbox --list-sessions
 ```
+
+You can run multiple sessions simultaneously in the same project directory. Each session gets a unique container, while sharing project data (history, todos, plans, tasks).
 
 The container image is automatically pulled from `quay.io/guimou/ccbox` on first run.
 
@@ -137,7 +143,7 @@ flowchart TB
 | **Project Data** | | |
 | `~/.claude/ccbox-projects/{name}_{hash}/` | History, todos, plans, tasks | Per-project |
 
-Each project directory gets isolated session data based on a hash of the workspace path, so you can have multiple projects with the same name in different locations.
+Each project directory gets isolated session data based on a hash of the workspace path, so you can have multiple projects with the same name in different locations. Multiple concurrent sessions in the same project share this data.
 
 ## Firewall
 

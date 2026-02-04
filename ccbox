@@ -95,6 +95,10 @@ setup_project_dirs() {
     mkdir -p "${project_dir}/plans"
     mkdir -p "${project_dir}/tasks"
     mkdir -p "${project_dir}/plugins"
+    mkdir -p "${project_dir}/shell-snapshots"
+    mkdir -p "${project_dir}/session-env"
+    mkdir -p "${project_dir}/logs"
+    mkdir -p "${project_dir}/debug"
     touch "${project_dir}/history.jsonl"
 
     echo "$project_dir"
@@ -117,6 +121,12 @@ ensure_global_config() {
     [[ -d "${config_dir}/skills" ]] || mkdir -p "${config_dir}/skills"
     [[ -d "${config_dir}/agents" ]] || mkdir -p "${config_dir}/agents"
     [[ -d "${config_dir}/rules" ]] || mkdir -p "${config_dir}/rules"
+    # Additional global directories for core features
+    [[ -d "${config_dir}/file-history" ]] || mkdir -p "${config_dir}/file-history"
+    [[ -d "${config_dir}/paste-cache" ]] || mkdir -p "${config_dir}/paste-cache"
+    [[ -d "${config_dir}/cache" ]] || mkdir -p "${config_dir}/cache"
+    [[ -d "${config_dir}/backups" ]] || mkdir -p "${config_dir}/backups"
+    [[ -f "${config_dir}/stats-cache.json" ]] || echo '{}' > "${config_dir}/stats-cache.json"
 }
 
 # Show first-run message for new project directories
@@ -489,6 +499,12 @@ PODMAN_ARGS=(
     -v "${CLAUDE_CONFIG_DIR}/skills:/home/claude/.claude/skills$(vol_flag "")"
     -v "${CLAUDE_CONFIG_DIR}/agents:/home/claude/.claude/agents$(vol_flag "")"
     -v "${CLAUDE_CONFIG_DIR}/rules:/home/claude/.claude/rules$(vol_flag "")"
+    # Additional global directories for core features
+    -v "${CLAUDE_CONFIG_DIR}/file-history:/home/claude/.claude/file-history$(vol_flag "")"
+    -v "${CLAUDE_CONFIG_DIR}/paste-cache:/home/claude/.claude/paste-cache$(vol_flag "")"
+    -v "${CLAUDE_CONFIG_DIR}/cache:/home/claude/.claude/cache$(vol_flag "")"
+    -v "${CLAUDE_CONFIG_DIR}/backups:/home/claude/.claude/backups$(vol_flag "")"
+    -v "${CLAUDE_CONFIG_DIR}/stats-cache.json:/home/claude/.claude/stats-cache.json$(vol_flag "")"
     # Project-specific data (isolated per project)
     -v "${PROJECT_DATA_DIR}/history.jsonl:/home/claude/.claude/history.jsonl$(vol_flag "")"
     -v "${PROJECT_DATA_DIR}/projects/-workspace:/home/claude/.claude/projects/-workspace$(vol_flag "")"
@@ -496,6 +512,11 @@ PODMAN_ARGS=(
     -v "${PROJECT_DATA_DIR}/plans:/home/claude/.claude/plans$(vol_flag "")"
     -v "${PROJECT_DATA_DIR}/tasks:/home/claude/.claude/tasks$(vol_flag "")"
     -v "${PROJECT_DATA_DIR}/plugins:/home/claude/.claude/plugins$(vol_flag "")"
+    # Additional project-scoped directories for shell/session features
+    -v "${PROJECT_DATA_DIR}/shell-snapshots:/home/claude/.claude/shell-snapshots$(vol_flag "")"
+    -v "${PROJECT_DATA_DIR}/session-env:/home/claude/.claude/session-env$(vol_flag "")"
+    -v "${PROJECT_DATA_DIR}/logs:/home/claude/.claude/logs$(vol_flag "")"
+    -v "${PROJECT_DATA_DIR}/debug:/home/claude/.claude/debug$(vol_flag "")"
     # Other config files
     -v "${HOME}/.claude.json:/home/claude/.claude.json$(vol_flag "")"
     -e "TERM=${TERM:-xterm-256color}"
@@ -515,6 +536,11 @@ fi
 # Add status line script if it exists
 if [[ -f "${CLAUDE_CONFIG_DIR}/status-line.sh" ]]; then
     PODMAN_ARGS+=(-v "${CLAUDE_CONFIG_DIR}/status-line.sh:/home/claude/.claude/status-line.sh$(vol_flag "ro")")
+fi
+
+# Add user's global RULES.md file if it exists (read-only)
+if [[ -f "${CLAUDE_CONFIG_DIR}/RULES.md" ]]; then
+    PODMAN_ARGS+=(-v "${CLAUDE_CONFIG_DIR}/RULES.md:/home/claude/.claude/RULES.md$(vol_flag "ro")")
 fi
 
 # Linux-specific mounts and environment variables

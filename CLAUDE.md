@@ -56,6 +56,65 @@ For local development, you can build the image locally:
 - `ccbox` - Host launch script
 - `CLAUDE_VERSION` - Optional file to pin Claude Code version (overridden by `--claude-version`)
 
+## What's Included
+
+The container comes pre-installed with tools commonly used by Claude Code plugins and skills.
+
+### Editors
+- **vim**, **nano**, **emacs** - Text editors for all preferences
+
+### Search & Navigation
+- **ripgrep** (`rg`) - Fast recursive grep
+- **fd** (`fd-find`) - User-friendly find alternative
+- **fzf** - Fuzzy finder for files and history
+- **tree** - Directory structure visualization
+
+### Languages & Runtimes
+- **Node.js** with npm and pnpm
+- **Python 3** with pip and virtualenv
+- **Go** (golang)
+- **Rust** (cargo)
+
+### Build Tools
+- **make**, **cmake**, **autoconf**, **automake**
+- **gcc**, **g++** - C/C++ compilers
+- **pkg-config** - Library configuration
+
+### Version Control
+- **git**, **gh** (GitHub CLI), **tig**
+
+### Terminal & Process
+- **tmux** - Terminal multiplexer
+- **htop** - Interactive process viewer
+- **strace** - System call tracer
+
+### Media Processing
+- **ffmpeg** - Video/audio processing
+- **ImageMagick** (`convert`) - Image manipulation
+
+### Document Processing
+- **pandoc** - Universal document converter
+- **graphviz** (`dot`) - Diagram generation
+
+### Database Clients
+- **sqlite**, **psql** (PostgreSQL), **mysql**, **redis-cli**
+
+### DevOps & Containers
+- **podman-remote** - Container management
+- **kubectl** - Kubernetes CLI
+- **oc** - OpenShift CLI
+- **ansible** - Configuration management
+
+### Code Quality
+- **ruff** - Fast Python linter
+- **ShellCheck** - Shell script analyzer
+- **bat** - Cat with syntax highlighting
+
+### Networking
+- **curl**, **wget** - HTTP clients
+- **openssh-clients** - SSH/SCP
+- **bind-utils** - DNS tools (dig, nslookup)
+
 ## Configuration
 
 ### Adding OS Packages

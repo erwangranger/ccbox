@@ -26,6 +26,12 @@ By default, the container image is pulled from `quay.io/guimou/ccbox`.
 # Disable clipboard access (for extra security)
 ./ccbox --no-clipboard
 
+# Enable agent teams (experimental)
+./ccbox --with-teams
+
+# Agent teams with split-pane mode (tmux)
+./ccbox --with-teams --with-tmux
+
 # Pass arguments directly to claude
 ./ccbox -- --version
 
@@ -60,8 +66,9 @@ For local development, you can build the image locally:
 
 The container comes pre-installed with tools commonly used by Claude Code plugins and skills.
 
-### Editors
+### Editors & Terminal
 - **vim**, **nano** - Text editors
+- **tmux** - Terminal multiplexer (for agent teams split-pane mode)
 
 ### Search & Navigation
 - **ripgrep** (`rg`) - Fast recursive grep
@@ -223,6 +230,33 @@ Follow the prompts to authenticate via browser or token. This creates an OAuth t
 - Revoke anytime: GitHub Settings → Developer settings → Personal access tokens
 - For extra security, use `--with-firewall` to limit network access
 - Use fine-grained PATs or GitHub App tokens for minimal scope
+
+## Agent Teams
+
+Agent teams let you coordinate multiple Claude Code instances working in parallel. This feature is experimental and opt-in.
+
+### Quick Start
+```bash
+# Enable agent teams with in-process mode (works in any terminal)
+./ccbox --with-teams
+
+# Enable agent teams with split-pane mode (each teammate gets a tmux pane)
+./ccbox --with-teams --with-tmux
+```
+
+### How it works
+- `--with-teams` sets `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` inside the container
+- `--with-tmux` starts claude inside a tmux session, enabling split-pane display for teammates
+- Without `--with-tmux`, teammates run in-process mode (cycle with Shift+Down)
+- tmux is pre-installed in the container image
+
+### Git Worktrees
+Teammates can use git worktrees to work on separate branches without conflicts. Worktrees are created under `/workspace/.claude/worktrees/` and are fully contained within the mounted workspace volume.
+
+### Notes
+- Split-pane mode requires `--with-tmux` because Ghostty (and some other terminals) don't support tmux auto-detection. Running inside tmux within the container bypasses this limitation.
+- Agent teams use significantly more tokens than a single session. Start with 3-5 teammates.
+- See the [Claude Code docs](https://code.claude.com/docs/en/agent-teams) for full usage details.
 
 ## License
 

@@ -90,10 +90,11 @@ setup_project_dirs() {
     fi
     local project_dir="${config_dir}/ccbox-projects/${project_name}_${path_hash}"
 
-    mkdir -p "${project_dir}/projects/-workspace"
+    mkdir -p "${project_dir}/projects"
     mkdir -p "${project_dir}/todos"
     mkdir -p "${project_dir}/plans"
     mkdir -p "${project_dir}/tasks"
+    mkdir -p "${project_dir}/teams"
     mkdir -p "${project_dir}/plugins"
     mkdir -p "${project_dir}/shell-snapshots"
     mkdir -p "${project_dir}/session-env"
@@ -223,6 +224,8 @@ NO_CLIPBOARD=false
 NO_GITHUB=false
 WITH_GITHUB=false
 GITHUB_TOKEN=""
+WITH_TEAMS=false
+WITH_TMUX=false
 LIST_SESSIONS=false
 SHOW_INSTALL=false
 CLAUDE_VERSION=""
@@ -249,6 +252,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --with-firewall)
             NO_FIREWALL=false
+            shift
+            ;;
+        --with-teams)
+            WITH_TEAMS=true
+            shift
+            ;;
+        --with-tmux)
+            WITH_TMUX=true
             shift
             ;;
         --list-sessions)
@@ -302,6 +313,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --local                  Use locally-built image instead of pulling"
             echo "  --claude-version VERSION Use specific Claude Code version"
             echo "  --with-firewall          Enable network firewall restrictions"
+            echo "  --with-teams             Enable agent teams (experimental)"
+            echo "  --with-tmux              Run claude inside tmux (for split-pane agent teams)"
             echo "  --no-clipboard           Disable clipboard access (for extra security)"
             echo "  --npm-global PATH        Mount npm global prefix (auto-detected if not set)"
             echo "  --with-github            Explicitly enable GitHub token injection (auto by default)"
@@ -318,6 +331,7 @@ while [[ $# -gt 0 ]]; do
             echo "  $(basename "$0") --build                      # Build locally"
             echo "  $(basename "$0") --with-firewall              # Run with network restrictions"
             echo "  $(basename "$0") --no-github                  # Run without GitHub token"
+            echo "  $(basename "$0") --with-teams --with-tmux     # Agent teams with split panes"
             echo "  $(basename "$0") -- --version                 # Pass args to claude"
             exit 0
             ;;
@@ -507,10 +521,11 @@ PODMAN_ARGS=(
     -v "${CLAUDE_CONFIG_DIR}/stats-cache.json:/home/claude/.claude/stats-cache.json$(vol_flag "")"
     # Project-specific data (isolated per project)
     -v "${PROJECT_DATA_DIR}/history.jsonl:/home/claude/.claude/history.jsonl$(vol_flag "")"
-    -v "${PROJECT_DATA_DIR}/projects/-workspace:/home/claude/.claude/projects/-workspace$(vol_flag "")"
+    -v "${PROJECT_DATA_DIR}/projects:/home/claude/.claude/projects$(vol_flag "")"
     -v "${PROJECT_DATA_DIR}/todos:/home/claude/.claude/todos$(vol_flag "")"
     -v "${PROJECT_DATA_DIR}/plans:/home/claude/.claude/plans$(vol_flag "")"
     -v "${PROJECT_DATA_DIR}/tasks:/home/claude/.claude/tasks$(vol_flag "")"
+    -v "${PROJECT_DATA_DIR}/teams:/home/claude/.claude/teams$(vol_flag "")"
     -v "${PROJECT_DATA_DIR}/plugins:/home/claude/.claude/plugins$(vol_flag "")"
     # Additional project-scoped directories for shell/session features
     -v "${PROJECT_DATA_DIR}/shell-snapshots:/home/claude/.claude/shell-snapshots$(vol_flag "")"
@@ -519,7 +534,7 @@ PODMAN_ARGS=(
     -v "${PROJECT_DATA_DIR}/debug:/home/claude/.claude/debug$(vol_flag "")"
     # Other config files
     -v "${HOME}/.claude.json:/home/claude/.claude.json$(vol_flag "")"
-    -e "TERM=${TERM:-xterm-256color}"
+    -e "TERM=$($WITH_TMUX && echo xterm-256color || echo "${TERM:-xterm-256color}")"
     -e "LANG=${LANG:-C.UTF-8}"
     -w /workspace
 )
@@ -566,6 +581,11 @@ if [[ -n "$CLAUDE_CODE_USE_VERTEX" ]]; then
 fi
 if [[ -n "$ANTHROPIC_VERTEX_PROJECT_ID" ]]; then
     PODMAN_ARGS+=(-e ANTHROPIC_VERTEX_PROJECT_ID="${ANTHROPIC_VERTEX_PROJECT_ID}")
+fi
+
+# Agent teams (experimental feature)
+if $WITH_TEAMS; then
+    PODMAN_ARGS+=(-e CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1)
 fi
 
 # Clipboard/display access for image pasting (CTRL+V)
@@ -652,12 +672,25 @@ if ! $NO_FIREWALL; then
     fi
 fi
 
-# Determine what command to run
-if $NO_FIREWALL; then
+# Build the claude launch command
+# Wraps claude in tmux if --with-tmux is set, with optional firewall init
+# Claude must be the direct process in the tmux pane (not wrapped in bash)
+# so that Ctrl+C (SIGINT) reaches it properly
+CLAUDE_CMD="claude ${EXTRA_ARGS[*]}"
+if $WITH_TMUX; then
+    # Start tmux detached, launch a background monitor to auto-close orphaned
+    # teammate panes, then attach. The monitor polls every 3s and kills non-lead
+    # panes that have dropped back to a bash prompt after claude exits.
+    CLAUDE_CMD="tmux new-session -d -s claude '${CLAUDE_CMD}' && (/home/claude/.ccbox-tmux-monitor.sh &>/dev/null &) && exec tmux attach -t claude"
+fi
+
+if $NO_FIREWALL && ! $WITH_TMUX; then
     PODMAN_ARGS+=("$IMAGE_REF" claude "${EXTRA_ARGS[@]}")
+elif $NO_FIREWALL; then
+    PODMAN_ARGS+=("$IMAGE_REF" /bin/bash -c "${CLAUDE_CMD}")
 else
     # Start with firewall initialization, then run claude
-    PODMAN_ARGS+=("$IMAGE_REF" /bin/bash -c "sudo /usr/local/bin/init-firewall.sh && exec claude ${EXTRA_ARGS[*]}")
+    PODMAN_ARGS+=("$IMAGE_REF" /bin/bash -c "sudo /usr/local/bin/init-firewall.sh && ${CLAUDE_CMD}")
 fi
 
 log_info "Starting Claude Code container..."
@@ -665,6 +698,8 @@ log_info "Workspace: $WORKSPACE_DIR"
 log_info "Session: $SESSION_ID"
 log_info "Firewall: $(if $NO_FIREWALL; then echo 'disabled'; else echo 'enabled'; fi)"
 log_info "Clipboard: $(if $NO_CLIPBOARD; then echo 'disabled'; else echo 'enabled'; fi)"
+log_info "Agent teams: $(if $WITH_TEAMS; then echo 'enabled'; else echo 'disabled'; fi)"
+log_info "Tmux: $(if $WITH_TMUX; then echo 'enabled'; else echo 'disabled'; fi)"
 if $NO_GITHUB; then
     log_info "GitHub: disabled"
 elif [[ -n "$GH_TOKEN_VALUE" ]]; then

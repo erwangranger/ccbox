@@ -32,7 +32,8 @@ RUN useradd -m -u 1000 -s /bin/bash claude && \
              /home/claude/.claude/statsig \
              /home/claude/.claude/todos \
              /home/claude/.claude/plans \
-             /home/claude/.claude/tasks && \
+             /home/claude/.claude/tasks \
+             /home/claude/.claude/teams && \
     chown -R claude:claude /workspace /home/claude/.claude
 
 # Copy firewall configuration
@@ -66,6 +67,33 @@ ENV PATH="/home/claude/.npm-global/bin:/home/claude/.local/bin:${PATH}"
 # Configure git to use GH_TOKEN for HTTPS authentication when available
 # This credential helper returns the token from the environment variable
 RUN git config --global credential.helper '!f() { test -n "$GH_TOKEN" && echo "password=$GH_TOKEN"; }; f'
+
+# tmux config for agent teams split-pane mode
+RUN printf '%s\n' \
+    'set -g mouse on' \
+    'set -g exit-empty on' \
+    > /home/claude/.tmux.conf
+
+# Background monitor script for auto-closing orphaned tmux teammate panes.
+# Polls every 3 seconds, kills non-lead panes where claude has exited
+# (pane is running just bash) and the pane is older than 10 seconds
+# (avoids race with pane startup before claude launches).
+RUN cat > /home/claude/.ccbox-tmux-monitor.sh << 'MONITOR'
+#!/bin/bash
+while tmux has-session -t claude 2>/dev/null; do
+    sleep 3
+    now=$(date +%s)
+    tmux list-panes -s -t claude -F '#{pane_id} #{pane_current_command} #{pane_created}' 2>/dev/null | \
+    while read -r pane_id cmd created; do
+        [ "$pane_id" = "%0" ] && continue
+        if [ "$cmd" = "bash" ]; then
+            age=$((now - created))
+            [ "$age" -gt 10 ] && tmux kill-pane -t "$pane_id" 2>/dev/null
+        fi
+    done
+done
+MONITOR
+RUN chmod +x /home/claude/.ccbox-tmux-monitor.sh
 
 # Set working directory to workspace
 WORKDIR /workspace

@@ -90,3 +90,6 @@ kubernetes1.33-client
 
 # Configuration management (DevOps skills)
 ansible
+
+# Terminal multiplexer (for agent teams split-pane mode)
+tmux

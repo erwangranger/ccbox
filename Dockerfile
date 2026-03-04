@@ -95,6 +95,9 @@ done
 MONITOR
 RUN chmod +x /home/claude/.ccbox-tmux-monitor.sh
 
+# Container-friendly Chrome flags (rootless container, limited /dev/shm)
+ENV CHROME_FLAGS="--no-sandbox --disable-dev-shm-usage"
+
 # Set working directory to workspace
 WORKDIR /workspace
 

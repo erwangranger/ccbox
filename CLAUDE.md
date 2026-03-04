@@ -93,6 +93,9 @@ The container comes pre-installed with tools commonly used by Claude Code plugin
 ### Database Clients
 - **sqlite**, **psql** (PostgreSQL), **mysql**, **redis-cli**
 
+### Browser (Headless)
+- **chromium-headless** - System Chromium for Playwright MCP and browser automation (requires `--executable-path` in MCP config)
+
 ### DevOps
 - **helm** - Kubernetes package manager
 - **kubectl** - Kubernetes CLI
